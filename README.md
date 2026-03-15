@@ -10,6 +10,26 @@ It uses a microservices architecture, decoupling a powerful AI reasoning engine 
 * **Automated Data Analysis:** Inspects database schemas and validates queries before execution.
 
 ## Architecture
+```mermaid
+graph TD
+    User([User / Browser]) -->|HTTP POST| Frontend[Frontend: Node.js/Express]
+    Frontend -->|Proxy POST| Backend[Backend: Python/FastAPI]
+    
+    subgraph AI["AI Agent Layer"]
+        Backend -->|Invoke| Agent[LangChain Deep Agent]
+        Agent -->|Completion| LLM[OpenAI GPT-4o]
+        LLM -->|Reasoning| Agent
+    end
+    
+    subgraph Data["Data Layer"]
+        Agent -->|Query / Discover| MDB_Ops[(MongoDB Atlas: sample_mflix)]
+        Backend -->|Write Logs| MDB_Logs[(MongoDB Atlas: agent_telemetry_db)]
+    end
+    
+    Backend -->|Response JSON + MQL| Frontend
+    Frontend -->|Display Result + MQL| User
+```
+
 * **Backend (Python / FastAPI):** Hosts a LangChain "Deep Agent" that connects to a MongoDB database. It handles schema inspection, query generation, validation, and execution.
 * **Frontend (Node.js / Express):** A lightweight server serving a vanilla HTML/JS chat interface and proxying requests securely to the Python API.
 
