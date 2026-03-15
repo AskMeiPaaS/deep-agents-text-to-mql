@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MongoDB AI Assistant</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #00ED64;
+            color: #001E2B;
+            padding: 1rem;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            padding: 10px 15px;
+            border-radius: 8px;
+            max-width: 80%;
+            line-height: 1.4;
+        }
+
+        .user-msg {
+            background: #001E2B;
+            color: white;
+            align-self: flex-end;
+        }
+
+        .agent-msg {
+            background: #e9ecef;
+            color: #333;
+            align-self: flex-start;
+        }
+
+        .input-area {
+            padding: 1rem;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #00ED64;
+            color: #001E2B;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #00c954;
+        }
+
+        .loading {
+            font-style: italic;
+            color: #888;
+            align-self: flex-start;
+            display: none;
+            margin: 10px 0;
+        }
+
+        .mql-block {
+            background: #1e1e1e;
+            color: #dcdcdc;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            margin: 10px 0;
+            overflow-x: auto;
+            border-left: 4px solid #00ED64;
+        }
+
+        .mql-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #00ED64;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="chat-container">
+        <div class="header">MongoDB Agent Chat</div>
+        <div class="messages" id="chat-box">
+            <div class="message agent-msg">Hello! I am connected to the `sample_mflix` database. What would you like to
+                know?</div>
+        </div>
+        <div class="loading" id="loading-indicator">Agent is querying the database...</div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="e.g., What are the top 5 movies of 2001?"
+                onkeypress="handleEnter(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const inputField = document.getElementById('user-input');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        function handleEnter(event) {
+            if (event.key === 'Enter') sendMessage();
+        }
+
+        async function sendMessage() {
+            const text = inputField.value.trim();
+            if (!text) return;
+
+            // Add user message to UI
+            appendMessage(text, 'user-msg');
+            inputField.value = '';
+
+            // Show loading state
+            loadingIndicator.style.display = 'block';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+                loadingIndicator.style.display = 'none';
+
+                if (data.reply) {
+                    appendMessage(data.reply, 'agent-msg', data.mql);
+                } else {
+                    appendMessage("Error: Could not get a response.", 'agent-msg');
+                }
+            } catch (err) {
+                loadingIndicator.style.display = 'none';
+                appendMessage("Connection error.", 'agent-msg');
+            }
+        }
+
+        function appendMessage(text, className, mql = null) {
+            const div = document.createElement('div');
+            div.className = `message ${className}`;
+            
+            // If there's MQL, show it first
+            if (mql && mql.length > 0) {
+                mql.forEach(query => {
+                    const mqlContainer = document.createElement('div');
+                    mqlContainer.className = 'mql-block';
+                    
+                    const label = document.createElement('div');
+                    label.className = 'mql-label';
+                    label.textContent = 'MQL EXECUTED:';
+                    
+                    const code = document.createElement('pre');
+                    code.style.margin = '0';
+                    code.style.whiteSpace = 'pre-wrap';
+                    code.style.wordBreak = 'break-all';
+                    code.textContent = query;
+                    
+                    mqlContainer.appendChild(label);
+                    mqlContainer.appendChild(code);
+                    div.appendChild(mqlContainer);
+                });
+            }
+
+            const textDiv = document.createElement('div');
+            if (typeof text === 'object') {
+                const pre = document.createElement('pre');
+                pre.style.whiteSpace = 'pre-wrap';
+                pre.style.wordBreak = 'break-all';
+                pre.style.margin = '0';
+                pre.textContent = JSON.stringify(text, null, 2);
+                textDiv.appendChild(pre);
+            } else {
+                // Convert basic newlines to HTML line breaks
+                textDiv.innerHTML = String(text).replace(/\n/g, '<br>');
+            }
+            div.appendChild(textDiv);
+            
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+
+</body>
+
+</html>
